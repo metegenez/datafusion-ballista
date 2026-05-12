@@ -270,7 +270,10 @@ pub struct ExecutorDataChange {
 pub struct PartitionStats {
     pub(crate) num_rows: Option<u64>,
     pub(crate) num_batches: Option<u64>,
-    pub(crate) num_bytes: Option<u64>,
+    /// Per-partition byte size reported by the shuffle writer. Read by the
+    /// AQE coalesce rule (in `ballista-scheduler`) to bin-pack alignment
+    /// groups, so this field is `pub` rather than `pub(crate)`.
+    pub num_bytes: Option<u64>,
 }
 
 impl fmt::Display for PartitionStats {
@@ -295,6 +298,11 @@ impl PartitionStats {
             num_batches,
             num_bytes,
         }
+    }
+
+    /// Returns the per-partition byte size, if populated by the writer.
+    pub fn num_bytes(&self) -> Option<u64> {
+        self.num_bytes
     }
 
     /// Returns the Arrow struct field representation of these statistics.
