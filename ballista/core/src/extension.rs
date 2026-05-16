@@ -650,10 +650,9 @@ impl SessionConfigExt for SessionConfig {
             })
     }
 
-    // f64 setter — uses set_str because SessionConfig has no set_f64 in this workspace
-    // and BallistaConfig::parse_value does not accept DataType::Float64. Stored value
-    // is round-tripped via f64::to_string() / f64::from_str(), mirroring the
-    // `with_ballista_job_name` set_str pattern.
+    // f64 setter — uses set_str because SessionConfig has no set_f64 in this
+    // workspace; the stored string is round-tripped via f64::to_string() /
+    // f64::from_str(), mirroring the `with_ballista_job_name` set_str pattern.
     fn with_ballista_coalesce_small_partition_factor(self, factor: f64) -> Self {
         let s = factor.to_string();
         if self.options().extensions.get::<BallistaConfig>().is_some() {

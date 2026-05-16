@@ -54,7 +54,7 @@
 //!
 //! # Default off
 //!
-//! `ballista.coalesce.enabled` is `false` by default. The rule is an opt-in
+//! `ballista.planner.coalesce.enabled` is `false` by default. The rule is an opt-in
 //! trade — coalescing reduces task overhead and IPC cost, but at the price
 //! of less downstream parallelism. Users who want the trade explicitly turn
 //! the rule on. When off, the rule short-circuits at the first statement
@@ -90,11 +90,23 @@
 //! bin-pack is a pure function of the resolved byte sizes, so the second
 //! pass produces the same decision.
 //!
+//! # Grouping discipline
+//!
+//! The bin-pack groups **neighboring** upstream partitions only — each
+//! output partition `k` covers a contiguous index range `[start_k,
+//! start_k+1)` over the input. Non-adjacent partitions are never folded
+//! together, even when that would yield a tighter byte fit. This matches
+//! Spark's `CoalesceShufflePartitions` and is what keeps hash
+//! co-partitioning intact across the rewrite: a hash bucket that used to
+//! live at index `i` still lives in the single output group that covers
+//! `i`, on every leaf of the alignment group.
+//!
 //! # Behavior preservation
 //!
-//! When `ballista.coalesce.enabled=false`, when the subtree has no leaf
-//! Exchanges, or when the bin-pack returns a degenerate `K`, the rule is a
-//! no-op and returns the input `Arc` verbatim (preserving `Arc::ptr_eq`).
+//! When `ballista.planner.coalesce.enabled=false`, when the subtree has no
+//! leaf Exchanges, or when the bin-pack returns a degenerate `K`, the rule
+//! is a no-op and returns the input `Arc` verbatim (preserving
+//! `Arc::ptr_eq`).
 
 use std::sync::Arc;
 

@@ -89,17 +89,17 @@ pub const BALLISTA_BROADCAST_JOIN_THRESHOLD_BYTES: &str =
 /// Configuration key to enable AQE coalesce-shuffle-partitions rule.
 /// Disabled by default — opt in when the workload benefits from larger
 /// downstream tasks more than from preserved parallelism.
-pub const BALLISTA_COALESCE_ENABLED: &str = "ballista.coalesce.enabled";
+pub const BALLISTA_COALESCE_ENABLED: &str = "ballista.planner.coalesce.enabled";
 /// Configuration key for the target post-coalesce partition byte size (bytes).
 /// Mirrors Spark's `spark.sql.adaptive.advisoryPartitionSizeInBytes`.
 pub const BALLISTA_COALESCE_TARGET_PARTITION_BYTES: &str =
-    "ballista.coalesce.target_partition_bytes";
+    "ballista.planner.coalesce.target_partition_bytes";
 /// Configuration key for the small-partition merge factor (Spark legacy semantics).
 pub const BALLISTA_COALESCE_SMALL_PARTITION_FACTOR: &str =
-    "ballista.coalesce.small_partition_factor";
+    "ballista.planner.coalesce.small_partition_factor";
 /// Configuration key for the merged-partition early-flush factor (Spark legacy semantics).
 pub const BALLISTA_COALESCE_MERGED_PARTITION_FACTOR: &str =
-    "ballista.coalesce.merged_partition_factor";
+    "ballista.planner.coalesce.merged_partition_factor";
 
 /// Result type for configuration parsing operations.
 pub type ParseResult<T> = result::Result<T, String>;
@@ -210,19 +210,14 @@ static CONFIG_ENTRIES: LazyLock<HashMap<String, ConfigEntry>> = LazyLock::new(||
         ),
         ConfigEntry::new(
             BALLISTA_COALESCE_SMALL_PARTITION_FACTOR.to_string(),
-            "Small-partition merge factor (Spark legacy). Stored as Utf8 because \
-             BallistaConfig::parse_value does not support Float64; parsed back via \
-             f64::from_str in the accessor."
-                .to_string(),
-            DataType::Utf8,
+            "Small-partition merge factor (Spark legacy).".to_string(),
+            DataType::Float64,
             Some("0.2".to_string()),
         ),
         ConfigEntry::new(
             BALLISTA_COALESCE_MERGED_PARTITION_FACTOR.to_string(),
-            "Merged-partition early-flush factor (Spark legacy). Stored as Utf8 — \
-             see small_partition_factor for rationale."
-                .to_string(),
-            DataType::Utf8,
+            "Merged-partition early-flush factor (Spark legacy).".to_string(),
+            DataType::Float64,
             Some("1.2".to_string()),
         ),
     ];
@@ -317,6 +312,11 @@ impl BallistaConfig {
             }
             DataType::Utf8 => {
                 val.to_string();
+            }
+            DataType::Float64 => {
+                val.to_string()
+                    .parse::<f64>()
+                    .map_err(|e| format!("{e:?}"))?;
             }
             _ => {
                 return Err(format!("not support data type: {data_type}"));
@@ -441,22 +441,13 @@ impl BallistaConfig {
     }
 
     /// Returns the small-partition merge factor (Spark legacy).
-    ///
-    /// Stored as Utf8 in CONFIG_ENTRIES because BallistaConfig::parse_value does not
-    /// support DataType::Float64. Falls back to 0.2 if the stored string fails to parse.
     pub fn coalesce_small_partition_factor(&self) -> f64 {
-        self.get_string_setting(BALLISTA_COALESCE_SMALL_PARTITION_FACTOR)
-            .parse::<f64>()
-            .unwrap_or(0.2)
+        self.get_float_setting(BALLISTA_COALESCE_SMALL_PARTITION_FACTOR)
     }
 
     /// Returns the merged-partition early-flush factor (Spark legacy).
-    ///
-    /// Stored as Utf8 — see `coalesce_small_partition_factor` for rationale.
     pub fn coalesce_merged_partition_factor(&self) -> f64 {
-        self.get_string_setting(BALLISTA_COALESCE_MERGED_PARTITION_FACTOR)
-            .parse::<f64>()
-            .unwrap_or(1.2)
+        self.get_float_setting(BALLISTA_COALESCE_MERGED_PARTITION_FACTOR)
     }
 
     /// Should client employ pull or push job tracking strategy
@@ -513,6 +504,19 @@ impl BallistaConfig {
             // infallible because we validate all configs in the constructor
             let v = entries.get(key).unwrap().default_value.as_ref().unwrap();
             v.to_string()
+        }
+    }
+
+    #[allow(dead_code)]
+    fn get_float_setting(&self, key: &str) -> f64 {
+        if let Some(v) = self.settings.get(key) {
+            // infallible because we validate all configs in the constructor
+            v.parse::<f64>().unwrap()
+        } else {
+            let entries = Self::valid_entries();
+            // infallible because we validate all configs in the constructor
+            let v = entries.get(key).unwrap().default_value.as_ref().unwrap();
+            v.parse::<f64>().unwrap()
         }
     }
 }

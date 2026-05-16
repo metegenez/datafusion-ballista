@@ -163,7 +163,7 @@ async fn should_attach_coalesce_when_partitions_pack_below_m()
     Ok(())
 }
 
-/// Disabled path: same inputs as above but `ballista.coalesce.enabled=false`.
+/// Disabled path: same inputs as above but `ballista.planner.coalesce.enabled=false`.
 /// The rule short-circuits at the first statement of `optimize()` and returns
 /// the plan untouched, so the leaf Exchange's coalesce slot stays None.
 #[tokio::test]
